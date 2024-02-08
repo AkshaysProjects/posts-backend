@@ -3,6 +3,7 @@ const jwt = require("jsonwebtoken");
 const db = require("../db/index");
 const dotenv = require("dotenv");
 const User = require("../models/user");
+const ObjectId = require("mongoose").Types.ObjectId;
 
 // Initialize dotenv to load environment variables from .env file
 dotenv.config();
@@ -151,5 +152,53 @@ const login = async (req, res) => {
   }
 };
 
+// Refresh an access token for a user
+const refreshToken = async (req, res) => {
+  try {
+    // Fetch the users collection from the database
+    const Users = await db.collection("users");
+
+    // Fetch the user with the given refresh token
+    const user = await Users.findOne({
+      _id: new ObjectId(req.user.id),
+    });
+
+    const userData = {
+      id: user._id,
+      name: user.name,
+      username: user.username,
+      email: user.email,
+      phone_number: user.phone_number,
+    };
+
+    // Generate a new access token for the user
+    const accessToken = jwt.sign(
+      userData,
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    // Generate a new refresh token for the user
+    const refreshToken = jwt.sign(
+      { id: user._id },
+      process.env.JWT_REFRESH_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    // Send the response back to the client
+    res.status(200).json({
+      access_token: accessToken,
+      token_type: "Bearer",
+      expiresIn: "3600",
+      refresh_token: refreshToken,
+    });
+  } catch (err) {
+    console.error(err);
+    res
+      .status(500)
+      .json({ success: false, message: "Error refreshing access token" });
+  }
+};
+
 // Export the controllers
-module.exports = { register, login };
+module.exports = { register, login, refreshToken };
